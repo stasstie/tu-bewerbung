@@ -3,7 +3,7 @@ import logging
 import torch
 from torchtext.vocab import build_vocab_from_iterator
 from torchtext.vocab import Vocab
-from torchtext.datasets.text_classification import TextClassificationDataset, _csv_iterator, _create_data_from_iterator
+from torchtext.datasets.text_classification import TextClassificationDataset,_csv_iterator,_create_data_from_iterator
 import os
 converter = Dslcc_to_pytorch()
 dict_df = converter.open_data("./.data/dslcc4/")
@@ -64,16 +64,16 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # the embeddings on the fly, ``nn.EmbeddingBag`` can enhance the
 # performance and memory efficiency to process a sequence of tensors.
 #
-# .. image:: ../_static/img/text_sentiment_ngrams_model.png
 #
 
 import torch.nn as nn
 import torch.nn.functional as F
-class TextSentiment(nn.Module):
+class TextClassification(nn.Module):
     def __init__(self, vocab_size, embed_dim, num_class):
         super().__init__()
         self.embedding = nn.EmbeddingBag(vocab_size, embed_dim, sparse=True)
         self.fc = nn.Linear(embed_dim, num_class)
+        self.smax = nn.Softmax(dim=1)
         self.init_weights()
 
     def init_weights(self):
@@ -84,22 +84,21 @@ class TextSentiment(nn.Module):
 
     def forward(self, text, offsets):
         embedded = self.embedding(text, offsets)
-        return self.fc(embedded)
+        result = self.smax(self.fc(embedded))
+        return result
 
 
 ######################################################################
 # Initiate an instance
 # --------------------
 #
-# The AG_NEWS dataset has four labels and therefore the number of classes
+# The dslcc4 dataset has four labels and therefore the number of classes
 # is four.
 #
 # ::
 #
-#    1 : World
-#    2 : Sports
-#    3 : Business
-#    4 : Sci/Tec
+#    1 : fr-CA
+#    2 : fr-FR
 #
 # The vocab size is equal to the length of vocab (including single word
 # and ngrams). The number of classes is equal to the number of labels,
@@ -107,9 +106,9 @@ class TextSentiment(nn.Module):
 #
 
 VOCAB_SIZE = len(train_dataset.get_vocab())
-EMBED_DIM = 32
+EMBED_DIM = 50
 NUN_CLASS = len(train_dataset.get_labels())
-model = TextSentiment(VOCAB_SIZE, EMBED_DIM, NUN_CLASS).to(device)
+model = TextClassification(VOCAB_SIZE, EMBED_DIM, NUN_CLASS).to(device)
 
 
 ######################################################################
@@ -187,6 +186,7 @@ def train_func(sub_train_):
 
     return train_loss / len(sub_train_), train_acc / len(sub_train_)
 
+
 def test(data_):
     loss = 0
     acc = 0
@@ -224,7 +224,7 @@ def test(data_):
 
 import time
 from torch.utils.data.dataset import random_split
-N_EPOCHS = 5
+N_EPOCHS = 10
 min_valid_loss = float('inf')
 
 criterion = torch.nn.CrossEntropyLoss().to(device)
@@ -250,54 +250,6 @@ for epoch in range(N_EPOCHS):
     print(f'\tLoss: {valid_loss:.4f}(valid)\t|\tAcc: {valid_acc * 100:.1f}%(valid)')
 
 
-######################################################################
-# Running the model on GPU with the following information:
-#
-# Epoch: 1 \| time in 0 minutes, 11 seconds
-#
-# ::
-#
-#        Loss: 0.0263(train)     |       Acc: 84.5%(train)
-#        Loss: 0.0001(valid)     |       Acc: 89.0%(valid)
-#
-#
-# Epoch: 2 \| time in 0 minutes, 10 seconds
-#
-# ::
-#
-#        Loss: 0.0119(train)     |       Acc: 93.6%(train)
-#        Loss: 0.0000(valid)     |       Acc: 89.6%(valid)
-#
-#
-# Epoch: 3 \| time in 0 minutes, 9 seconds
-#
-# ::
-#
-#        Loss: 0.0069(train)     |       Acc: 96.4%(train)
-#        Loss: 0.0000(valid)     |       Acc: 90.5%(valid)
-#
-#
-# Epoch: 4 \| time in 0 minutes, 11 seconds
-#
-# ::
-#
-#        Loss: 0.0038(train)     |       Acc: 98.2%(train)
-#        Loss: 0.0000(valid)     |       Acc: 90.4%(valid)
-#
-#
-# Epoch: 5 \| time in 0 minutes, 11 seconds
-#
-# ::
-#
-#        Loss: 0.0022(train)     |       Acc: 99.0%(train)
-#        Loss: 0.0000(valid)     |       Acc: 91.0%(valid)
-#
-
-
-######################################################################
-# Evaluate the model with test dataset
-# ------------------------------------
-#
 
 print('Checking the results of test dataset...')
 test_loss, test_acc = test(test_dataset)
